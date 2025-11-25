@@ -681,6 +681,16 @@ class ChuanHuaTongPlugin(Star):
             logger.error("[传话筒] Pillow 合成失败: %s", exc)
             return None
 
+    def _cleanup_temp_file(self, path: Optional[str]):
+        if not path:
+            return
+        try:
+            os.remove(path)
+        except FileNotFoundError:
+            return
+        except Exception as exc:
+            logger.debug("[传话筒] 删除临时文件失败: %s", exc)
+
     def _render_pillow_panel(self, text: str, emotion: str) -> Optional[str]:
         layout = self._layout()
         width = int(layout.get("canvas_width", 1280))
@@ -1192,6 +1202,9 @@ class ChuanHuaTongPlugin(Star):
             event.stop_event()
         except Exception as exc:
             logger.error(f"[传话筒] 设置图片结果失败: {exc}")
+            event.set_result(event.plain_result(cleaned_text))
+        finally:
+            self._cleanup_temp_file(image_path)
 
     def _ensure_prompt_template(self):
         if not isinstance(self._cfg_obj, dict):
