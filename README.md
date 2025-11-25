@@ -1,6 +1,9 @@
 # 传话筒（astrbot_plugin_chuanhuatong）
 
 将 AstrBot 的所有纯文本回复转换成带立绘的 GalGame 风聊天框图片，支持情绪差分、多段富文本与拖拽式 WebUI 布局设置。
+<img width="2030" height="886" alt="image" src="https://github.com/user-attachments/assets/b507f5c7-121a-4183-9a13-ee2e1f5e1832" />
+<img width="1600" height="600" alt="image" src="https://github.com/user-attachments/assets/064d8964-b09a-4b94-9b64-d062b45d0f69" />
+<img width="469" height="244" alt="image" src="https://github.com/user-attachments/assets/7a37b40e-0419-415d-a908-d66692b7045d" />
 
 ## 功能特性
 
