@@ -245,6 +245,24 @@ AstrBot/data/plugin_data/astrbot_plugin_chuanhuatong/
 
 ---
 
+## 预设模板
+《魔法少女的魔女审判》全角色模板
+请到 https://github.com/bvzrays/astrbot_plugin_chuanhuatong-Magical-Girl-Witch-Trials 下载文件，按教程导入模板
+<img width="1600" height="600" alt="e44d70c03555daa6057b2ac702bd3d43" src="https://github.com/user-attachments/assets/884d770e-0eee-4161-b615-950874369820" />
+<img width="1600" height="600" alt="60e499029f905c74da834b0d1b0a6fc0" src="https://github.com/user-attachments/assets/5ee31341-7946-489a-b9c7-b374d75c346e" />
+<img width="1600" height="600" alt="c74f77dfb7e1ce3180f206da0e8c8a22" src="https://github.com/user-attachments/assets/e8ad30af-57f0-4fdb-be1e-17580de2c797" />
+<img width="1600" height="600" alt="ce38ffc9fb01a02142c8c8453b69e57f" src="https://github.com/user-attachments/assets/04f47594-5712-4035-acc1-5df95f96bed5" />
+<img width="1600" height="600" alt="1417f5d131b57a2ccb09278b056b84ce" src="https://github.com/user-attachments/assets/4bff2383-288d-4c0c-af5e-317a4e9253dc" />
+<img width="1600" height="600" alt="4907720c7bbe1148dfd1aaeb1f02ef45" src="https://github.com/user-attachments/assets/88b12922-e8d3-41ae-87d9-7fabae96dfb1" />
+<img width="1600" height="600" alt="cf0b0ba02c2abc855ca2df975a1f14b2" src="https://github.com/user-attachments/assets/646621e8-6b36-48b8-a754-5d33b4fe087c" />
+<img width="1600" height="600" alt="ec8bd6ccf0f9dd57472b3c92a0ff84fb" src="https://github.com/user-attachments/assets/44b4a9d3-577b-457c-bd79-2a061f170e44" />
+<img width="1600" height="600" alt="4aa64bbae0dd16fd5d644355d553a370" src="https://github.com/user-attachments/assets/686af46c-4339-4772-8923-98b253756e8c" />
+<img width="1600" height="600" alt="6e8d4c78c0d9ed7825e2978ca1040b7c" src="https://github.com/user-attachments/assets/2d936689-63f3-434a-ae90-d430b1e4f6ed" />
+<img width="1600" height="600" alt="16a36d6b7e539163c2a88f24eca77001" src="https://github.com/user-attachments/assets/19e5473c-7687-4d03-91d6-21a79bd88351" />
+<img width="1600" height="600" alt="416687fb4a0c077dd964d599af26a92a" src="https://github.com/user-attachments/assets/6c1aca06-122c-4f8f-ab30-e7f7d07ff158" />
+<img width="1600" height="600" alt="48e77c8ce9ff43b3052eec5dfbd2d3bc" src="https://github.com/user-attachments/assets/d0e0cac4-d0cd-4c5b-b454-3605721b4c98" />
+<img width="1600" height="600" alt="909cadd9d92025668c9954bcf1413d7d" src="https://github.com/user-attachments/assets/3aec06e6-95ea-48fe-8f1c-84469b90abb5" />
+
 ## 更新日志
 
 ### v1.6.0
