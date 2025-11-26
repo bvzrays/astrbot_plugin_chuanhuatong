@@ -4,7 +4,8 @@
 
 将 AstrBot 的纯文本回复转换成带立绘的 GalGame 风聊天框图片，支持情绪差分、多层文本、拖拽式 WebUI 布局与自定义组件模板。
 
-【这里放整体效果演示图片】
+<img width="511" height="684" alt="image" src="https://github.com/user-attachments/assets/f84f4295-02fc-430b-b390-fb23758bdd77" />
+
 
 ---
 
@@ -52,7 +53,8 @@
   - 完全基于本地 Pillow 渲染，无需浏览器 / Playwright。
   - 如渲染出错会自动回退为纯文本发送，保证消息不丢失。
 
-【这里放 WebUI 布局编辑界面截图】
+<img width="2111" height="1111" alt="image" src="https://github.com/user-attachments/assets/6fc31c10-8c61-480c-93ac-f4b09c4306cc" />
+
 
 ---
 
@@ -69,8 +71,8 @@
 3. **确认 WebUI 端口**
    - 默认 WebUI 监听：`http://127.0.0.1:18765`
    - 可在配置中修改 `webui_host` / `webui_port`，请确保端口未被其他程序占用。
+<img width="947" height="185" alt="image" src="https://github.com/user-attachments/assets/9318fc9c-cdab-476c-9a1b-4eb2212a5409" />
 
-【这里放 AstrBot 插件列表中显示本插件的截图】
 
 ---
 
@@ -109,7 +111,8 @@
     - `AstrBot/data/plugin_data/astrbot_plugin_chuanhuatong/layout_state.json`
   - 重启 AstrBot 或重新加载插件不会丢失布局；点击“重置布局”可回到插件内置的默认模板。
 
-【这里放 WebUI 文本样式编辑区域截图】
+<img width="343" height="414" alt="image" src="https://github.com/user-attachments/assets/1223e0a0-daf0-43ee-bbc2-86a2faf34599" />
+
 
 ---
 
@@ -141,7 +144,8 @@
   - 如果文本中没有出现任何已知标签，则使用配置项 `default_emotion`。
   - 若 `default_emotion` 无法匹配到有效目录，会使用第一个已启用的情绪作为回退。
 
-【这里放不同情绪立绘对比的拼图截图】
+<img width="427" height="509" alt="image" src="https://github.com/user-attachments/assets/c11e5cfa-3e53-4d89-af7a-208648effa1f" />
+
 
 ---
 
@@ -174,8 +178,6 @@ astrbot_plugin_chuanhuatong/
     - `AstrBot/data/plugins/astrbot_plugin_chuanhuatong/zujian/名称框.png`
   - 这样默认布局中的组件图层就能直接引用这些图片，第一次打开 WebUI 即可看到完整模板布局。
 
-【这里放资源目录结构（资源管理器截图）】
-
 ---
 
 ## 数据与用户上传目录
@@ -196,7 +198,8 @@ AstrBot/data/plugin_data/astrbot_plugin_chuanhuatong/
 - 直接将组件 / 立绘 / 字体文件放入上述目录（及其子目录）也会被 WebUI 识别。
 - 用户上传的组件与字体会与插件内置的文件一起出现在下拉列表中，可在 WebUI 中统一管理。
 
-【这里放 data 目录结构截图】
+<img width="653" height="194" alt="image" src="https://github.com/user-attachments/assets/c0ae569b-c8b6-49f0-9047-1913b1a420f9" />
+
 
 ---
 
@@ -237,7 +240,8 @@ AstrBot/data/plugin_data/astrbot_plugin_chuanhuatong/
 - 未检测到背景或立绘文件时，会自动降级为纯背景 / 无立绘模式，保证消息仍可正常发送。
 - 若在其他插件中也修改了 `event.get_result()` 或拦截消息，请注意插件执行顺序以及 `event.stop_event()` 的使用，避免互相覆盖。
 
-【这里放实际聊天窗口中渲染结果的截图】
+![dfc325accb815446a2b4503599c9efc3_720](https://github.com/user-attachments/assets/41acac86-de9d-4bf1-8acc-3a985affc53f)
+
 
 ---
 
