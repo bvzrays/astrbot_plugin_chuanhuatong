@@ -300,6 +300,8 @@ class ChuanHuaTongPlugin(Star):
         self._user_char_dir.mkdir(parents=True, exist_ok=True)
         self._presets_dir = self._data_dir / "presets"
         self._presets_dir.mkdir(parents=True, exist_ok=True)
+        self._current_preset_file = self._data_dir / "current_preset.json"
+        self._current_preset_meta: dict[str, Any] = self._load_current_preset_meta()
         self._layout_file = self._data_dir / "layout_state.json"
         self._layout_lock = asyncio.Lock()
         self._layout_state = self._load_layout_state()
@@ -543,6 +545,74 @@ class ChuanHuaTongPlugin(Star):
             "saved_at": record.get("saved_at"),
             "layout": layout,
         }
+
+    def _load_current_preset_meta(self) -> dict[str, Any]:
+        if not self._current_preset_file.exists():
+            return {}
+        try:
+            return json.loads(self._current_preset_file.read_text(encoding="utf-8"))
+        except Exception:
+            logger.debug("[传话筒] 读取当前预设记录失败", exc_info=True)
+            return {}
+
+    def _remember_current_preset(self, record: Optional[dict[str, Any]]):
+        if not record:
+            self._current_preset_meta = {}
+            try:
+                if self._current_preset_file.exists():
+                    self._current_preset_file.unlink()
+            except Exception:
+                logger.debug("[传话筒] 清理当前预设记录失败", exc_info=True)
+            return
+        payload = {
+            "name": record.get("name"),
+            "slug": record.get("slug"),
+            "saved_at": record.get("saved_at"),
+        }
+        self._current_preset_meta = payload
+        try:
+            self._current_preset_file.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+        except Exception:
+            logger.debug("[传话筒] 写入当前预设记录失败", exc_info=True)
+
+    def _current_preset_name(self) -> str:
+        return str(self._current_preset_meta.get("name") or "")
+
+    def _format_preset_list_message(self) -> str:
+        presets = self._list_presets()
+        current_name = self._current_preset_name()
+        current_slug = str(self._current_preset_meta.get("slug") or "")
+        lines: list[str] = []
+        if current_name:
+            lines.append(f"当前预设：{current_name}")
+        else:
+            lines.append("当前预设：自定义布局（未绑定预设）")
+        if not presets:
+            lines.append("暂未保存任何预设。")
+            return "\n".join(lines)
+        lines.append("可用预设：")
+        for idx, info in enumerate(presets, start=1):
+            name = info.get("name") or info.get("slug") or f"未命名-{idx}"
+            saved = info.get("saved_at") or "未知时间"
+            marker = ""
+            if current_name and (info.get("name") == current_name):
+                marker = " <- 当前"
+            elif current_slug and (info.get("slug") == current_slug):
+                marker = " <- 当前"
+            lines.append(f"{idx}. {name}（保存于 {saved}）{marker}")
+        lines.append("使用 /切换预设 预设名称 即可切换。")
+        return "\n".join(lines)
+
+    @staticmethod
+    def _is_event_admin(event: AstrMessageEvent) -> bool:
+        checker = getattr(event, "is_admin", None)
+        if callable(checker):
+            try:
+                return bool(checker())
+            except Exception:
+                logger.debug("[传话筒] 检查管理员权限失败", exc_info=True)
+        role = getattr(event, "role", None)
+        return str(role).lower() == "admin"
 
     def _normalize_layout(self, layout: Dict[str, Any]) -> Dict[str, Any]:
         data = copy.deepcopy(self.DEFAULT_LAYOUT)
@@ -1516,6 +1586,7 @@ class ChuanHuaTongPlugin(Star):
             raise web.HTTPBadRequest(text="layout invalid")
         record = self._save_preset(name, layout)
         self._set_layout_state(record["layout"])
+        self._remember_current_preset(record)
         return web.json_response({
             "ok": True,
             "preset": {k: record.get(k) for k in ("name", "slug", "saved_at")},
@@ -1536,6 +1607,7 @@ class ChuanHuaTongPlugin(Star):
         if not record:
             raise web.HTTPNotFound(text="preset not found")
         self._set_layout_state(record["layout"])
+        self._remember_current_preset(record)
         return web.json_response({
             "ok": True,
             "preset": {k: record.get(k) for k in ("name", "slug", "saved_at")},
@@ -1754,11 +1826,12 @@ class ChuanHuaTongPlugin(Star):
     def _switch_preset(self, target: str) -> tuple[bool, str, Optional[str]]:
         normalized = str(target or "").strip()
         if not normalized:
-            return False, "用法：/切换预设 预设名称（也支持 *切换预设）", None
+            return False, self._format_preset_list_message(), None
         record = self._load_preset(normalized)
         if not record:
-            return False, f"未找到名为「{normalized}」的预设。", None
+            return False, f"未找到名为「{normalized}」的预设。\n\n{self._format_preset_list_message()}", None
         self._set_layout_state(record["layout"])
+        self._remember_current_preset(record)
         return True, f"已切换到预设「{record['name']}」。", record.get("name") or normalized
 
     @staticmethod
@@ -1788,6 +1861,11 @@ class ChuanHuaTongPlugin(Star):
         matched, target = self._parse_preset_command(stripped)
         if not matched:
             return False
+        if not self._is_event_admin(event):
+            denial = "只有管理员可以切换预设。"
+            event.set_result(event.plain_result(denial))
+            event.stop_event()
+            return True
         success, message, preset_name = self._switch_preset(target)
         event.set_result(event.plain_result(message))
         event.stop_event()
@@ -1797,9 +1875,19 @@ class ChuanHuaTongPlugin(Star):
 
     @filter.command("切换预设")
     async def command_switch_preset(self, event: AstrMessageEvent, *preset_tokens: str):
+        if not self._is_event_admin(event):
+            yield event.plain_result("只有管理员可以切换预设。")
+            event.stop_event()
+            return
         target = " ".join(preset_tokens).strip()
         success, message, preset_name = self._switch_preset(target)
         yield event.plain_result(message)
         event.stop_event()
         if success:
             logger.info("[传话筒] 通过命令切换预设: %s", preset_name)
+
+    @filter.command("预设列表")
+    async def command_list_presets(self, event: AstrMessageEvent):
+        message = self._format_preset_list_message()
+        yield event.plain_result(message)
+        event.stop_event()
