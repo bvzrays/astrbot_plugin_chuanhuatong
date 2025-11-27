@@ -47,7 +47,7 @@ class EmotionMeta:
     "astrbot_plugin_chuanhuatong",
     "bvzrays",
     "传话筒：将 Bot 的文字回复渲染为 Gal 风立绘对话框",
-    "1.6.0",
+    "1.7.0",
     "https://github.com/bvzrays/astrbot_plugin_chuanhuatong",
 )
 class ChuanHuaTongPlugin(Star):
@@ -833,21 +833,37 @@ class ChuanHuaTongPlugin(Star):
             self._cached_emotions = self._load_emotion_sets()
         return self._cached_emotions.copy()
 
+    def _remove_emotion_tags(self, text: str) -> str:
+        """移除文本中的情绪标签（&xxx&格式），参考 meme_manager_lite 的实现"""
+        if not text:
+            return text
+        # 使用正则表达式替换所有 &xxx& 标签
+        cleaned = self.EMOTION_PATTERN.sub("", text)
+        # 清理标签移除后可能留下的多余空格（但保留换行符）
+        # 将多个连续空格替换为单个空格，但保留换行符
+        cleaned = re.sub(r"[ \t]+", " ", cleaned)  # 只替换空格和制表符，不替换换行
+        # 清理行首行尾的空格（但保留换行符结构）
+        lines = cleaned.split("\n")
+        cleaned_lines = [line.strip() for line in lines]
+        cleaned = "\n".join(cleaned_lines)
+        return cleaned
+
     def _emotion_from_text(self, text: str) -> Tuple[str, str]:
+        """从文本中提取情绪标签并返回清理后的文本"""
         mapping = self._emotion_meta()
         matches = self.EMOTION_PATTERN.findall(text)
         selected: Optional[str] = None
-        cleaned = text
         if matches:
             for raw in matches:
-                cleaned = cleaned.replace(f"&{raw}&", "")
                 key = raw.lower()
                 if selected is None and key in mapping:
                     selected = key
+        # 清理标签
+        cleaned = self._remove_emotion_tags(text)
         default_key = str(self.cfg().get("default_emotion", "")).lower()
         if not default_key or default_key not in mapping:
             default_key = next(iter(mapping.keys()))
-        return (selected or default_key), cleaned.strip()
+        return (selected or default_key), cleaned
 
     def _file_to_data_url(self, file_path: Path) -> str:
         if not file_path.exists():
@@ -1566,6 +1582,11 @@ class ChuanHuaTongPlugin(Star):
     async def _handle_reset_layout(self, request: web.Request):
         await self._authorize(request)
         state = self._reset_layout_state()
+        # 重置时清除当前预设记录，恢复到默认布局
+        self._remember_current_preset(None)
+        # 刷新缓存
+        self._cached_emotions.clear()
+        self._emotion_meta()  # 重新加载情绪配置
         return web.json_response({"ok": True, "layout": state})
 
     async def _handle_list_presets_api(self, request: web.Request):
@@ -1587,11 +1608,15 @@ class ChuanHuaTongPlugin(Star):
         record = self._save_preset(name, layout)
         self._set_layout_state(record["layout"])
         self._remember_current_preset(record)
+        # 刷新缓存，确保立绘正确显示
+        self._cached_emotions.clear()
+        self._emotion_meta()  # 重新加载情绪配置
         return web.json_response({
             "ok": True,
             "preset": {k: record.get(k) for k in ("name", "slug", "saved_at")},
             "layout": record["layout"],
             "presets": self._list_presets(),
+            "character_roles": self._list_character_roles(),  # 刷新角色列表
         })
 
     async def _handle_load_preset(self, request: web.Request):
@@ -1608,11 +1633,15 @@ class ChuanHuaTongPlugin(Star):
             raise web.HTTPNotFound(text="preset not found")
         self._set_layout_state(record["layout"])
         self._remember_current_preset(record)
+        # 刷新缓存，确保立绘正确显示
+        self._cached_emotions.clear()
+        self._emotion_meta()  # 重新加载情绪配置
         return web.json_response({
             "ok": True,
             "preset": {k: record.get(k) for k in ("name", "slug", "saved_at")},
             "layout": record["layout"],
             "presets": self._list_presets(),
+            "character_roles": self._list_character_roles(),  # 刷新角色列表
         })
 
     async def _handle_list_components_api(self, request: web.Request):
@@ -1724,7 +1753,7 @@ class ChuanHuaTongPlugin(Star):
 
     if hasattr(filter, "on_message"):
 
-        @filter.on_message()
+        @filter.on_message(priority=-10)  # 降低优先级，确保在其他插件之后处理
         async def handle_message_events(
             self,
             event: AstrMessageEvent,
@@ -1732,7 +1761,7 @@ class ChuanHuaTongPlugin(Star):
         ):
             await self._handle_preset_command(event, req)
 
-    @filter.on_llm_request()
+    @filter.on_llm_request(priority=-10)  # 降低优先级，确保在其他插件之后处理
     async def inject_emotion_prompt(self, event: AstrMessageEvent, req: ProviderRequest):
         handled = await self._handle_preset_command(event, req)
         if handled:
@@ -1745,36 +1774,117 @@ class ChuanHuaTongPlugin(Star):
         instruction = template.replace("{tags}", ", ".join(tags))
         req.system_prompt = (req.system_prompt or "") + "\n" + instruction
 
-    @filter.on_llm_response()
+    async def _update_conversation_history(self, event: AstrMessageEvent, cleaned_text: str):
+        """更新对话历史，移除表情标签"""
+        try:
+            umo = event.unified_msg_origin
+            conv_mgr = self.context.conversation_manager
+            curr_cid = await conv_mgr.get_curr_conversation_id(umo)
+            if not curr_cid:
+                return
+            conversation = await conv_mgr.get_conversation(umo, curr_cid, create_if_not_exists=False)
+            if not conversation or not conversation.history:
+                return
+            try:
+                history = json.loads(conversation.history) if isinstance(conversation.history, str) else conversation.history
+                if not isinstance(history, list) or not history:
+                    return
+                # 更新最后一条助手消息，移除表情标签
+                last_msg = history[-1]
+                if isinstance(last_msg, dict) and last_msg.get("role") == "assistant":
+                    original_content = last_msg.get("content", "")
+                    # 如果内容不同，更新历史
+                    if original_content != cleaned_text:
+                        last_msg["content"] = cleaned_text
+                        await conv_mgr.update_conversation(umo, curr_cid, history=history)
+                        logger.debug("[传话筒] 已更新对话历史，移除表情标签")
+            except Exception as e:
+                logger.debug("[传话筒] 更新对话历史失败: %s", e)
+        except Exception as e:
+            logger.debug("[传话筒] 清理对话历史中的表情标签失败: %s", e)
+
+    @filter.on_llm_response(priority=-10)  # 降低优先级，确保在其他插件之后处理
     async def handle_llm_response(self, event: AstrMessageEvent, resp: LLMResponse):
+        """保存响应对象，供 on_decorating_result 使用"""
         if not self._cfg_bool("enable_render", True):
             return
-        text = self._extract_llm_text(resp)
-        if not text:
+        # 保存响应对象，供后续钩子使用
+        event.set_extra("llm_resp", resp)
+
+    @filter.on_decorating_result(priority=-10)  # 降低优先级，确保在其他插件之后处理
+    async def on_decorating_result(self, event: AstrMessageEvent):
+        """在装饰结果时清理表情标签，参考 meme_manager_lite 的实现"""
+        if not self._cfg_bool("enable_render", True):
             return
-        emotion, cleaned_text = self._emotion_from_text(text)
-        if not cleaned_text:
+        
+        # 获取保存的响应对象
+        resp = event.get_extra("llm_resp")
+        if isinstance(resp, LLMResponse):
+            # 清理响应文本中的表情标签（参考 meme_manager_lite）
+            if hasattr(resp, "completion_text") and resp.completion_text:
+                resp.completion_text = self._remove_emotion_tags(resp.completion_text)
+            elif hasattr(resp, "text") and resp.text:
+                resp.text = self._remove_emotion_tags(resp.text)
+            elif hasattr(resp, "content") and resp.content:
+                resp.content = self._remove_emotion_tags(resp.content)
+        
+        # 获取当前结果并清理消息链中的文本
+        result = event.get_result()
+        if not result:
             return
-        char_limit = int(self.cfg().get("render_char_threshold", 60) or 0)
-        if char_limit > 0:
-            text_len = self._count_visible_chars(cleaned_text)
-            if text_len > char_limit:
-                logger.info("[传话筒] 文本长度 %s 超过阈值 %s，跳过渲染。", text_len, char_limit)
-                event.set_result(event.plain_result(cleaned_text))
-                return
-        image_path = await self._render_with_fallback(cleaned_text, emotion)
-        if not image_path:
-            logger.warning("[传话筒] 渲染失败，退回纯文本。")
-            event.set_result(event.plain_result(cleaned_text))
+        chain = result.chain
+        if not chain:
             return
-        try:
-            event.set_result(event.image_result(image_path))
-            event.stop_event()
-        except Exception as exc:
-            logger.error(f"[传话筒] 设置图片结果失败: {exc}")
-            event.set_result(event.plain_result(cleaned_text))
-        finally:
-            self._schedule_cleanup(image_path, delay=90.0)
+        
+        # 提取完整文本用于判断和渲染
+        full_text_parts = []
+        new_chain = []
+        has_non_text = False
+        
+        for item in chain:
+            if isinstance(item, PLAIN_COMPONENT_TYPES):
+                original_text = getattr(item, "text", "") or ""
+                cleaned_text = self._remove_emotion_tags(original_text)
+                full_text_parts.append(cleaned_text)
+                if cleaned_text:
+                    # 创建新的文本组件（参考 meme_manager_lite 的方式）
+                    new_item = type(item)(cleaned_text)
+                    new_chain.append(new_item)
+            else:
+                has_non_text = True
+                new_chain.append(item)
+        
+        # 更新消息链
+        result.chain = new_chain
+        
+        # 如果只有文本组件，尝试渲染
+        if not has_non_text and full_text_parts:
+            full_text = "".join(full_text_parts)
+            if full_text:
+                # 更新对话历史
+                await self._update_conversation_history(event, full_text)
+                
+                # 提取情绪
+                emotion, _ = self._emotion_from_text(full_text)
+                
+                # 检查字符限制
+                char_limit = int(self.cfg().get("render_char_threshold", 60) or 0)
+                if char_limit > 0:
+                    text_len = self._count_visible_chars(full_text)
+                    if text_len > char_limit:
+                        logger.info("[传话筒] 文本长度 %s 超过阈值 %s，跳过渲染。", text_len, char_limit)
+                        return
+                
+                # 尝试渲染
+                image_path = await self._render_with_fallback(full_text, emotion)
+                if image_path:
+                    try:
+                        result.chain = [Comp.Image.fromFileSystem(image_path)]
+                        self._schedule_cleanup(image_path, delay=90.0)
+                    except Exception as exc:
+                        logger.error(f"[传话筒] 设置图片结果失败: {exc}")
+                else:
+                    logger.warning("[传话筒] 渲染失败，退回纯文本。")
 
     def _ensure_prompt_template(self):
         if not isinstance(self._cfg_obj, dict):
@@ -1832,35 +1942,28 @@ class ChuanHuaTongPlugin(Star):
             return False, f"未找到名为「{normalized}」的预设。\n\n{self._format_preset_list_message()}", None
         self._set_layout_state(record["layout"])
         self._remember_current_preset(record)
+        # 刷新缓存，确保立绘正确显示
+        self._cached_emotions.clear()
+        self._emotion_meta()  # 重新加载情绪配置
         return True, f"已切换到预设「{record['name']}」。", record.get("name") or normalized
-
-    @staticmethod
-    def _parse_preset_command(text: str) -> tuple[bool, str]:
-        stripped = (text or "").strip()
-        if not stripped:
-            return False, ""
-        # 允许 / 或 * 前缀（兼容 AstrBot 指令与频道常用写法）
-        if stripped[0] in {"/", "*", "／", "＊"}:
-            stripped = stripped[1:].lstrip()
-        if not stripped.startswith("切换预设"):
-            return False, ""
-        remainder = stripped[len("切换预设"):].strip()
-        return True, remainder
 
     async def _handle_preset_command(
         self,
         event: AstrMessageEvent,
         req: Optional[ProviderRequest],
     ) -> bool:
+        """处理预设切换命令（用于事件钩子，不用于 @filter.command）"""
         if hasattr(event, "is_stopped") and event.is_stopped():
             return False
-        text = self._extract_user_plaintext(event, req)
-        if not text:
-            return False
+        # 检查是否是指令消息（通过 message_str 判断，框架会自动处理命令符）
+        text = event.message_str or ""
         stripped = text.strip()
-        matched, target = self._parse_preset_command(stripped)
-        if not matched:
+        # 移除可能的命令符前缀（框架可能已经处理，但为了兼容性保留）
+        if stripped and stripped[0] in {"/", "*", "／", "＊"}:
+            stripped = stripped[1:].lstrip()
+        if not stripped.startswith("切换预设"):
             return False
+        target = stripped[len("切换预设"):].strip()
         if not self._is_event_admin(event):
             denial = "只有管理员可以切换预设。"
             event.set_result(event.plain_result(denial))

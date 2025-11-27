@@ -1,6 +1,6 @@
 name: astrbot_plugin_chuanhuatong
 display_name: 传话筒·立绘对话框
 desc: 拦截 Bot 文本输出，套用 Gal 风气泡和立绘的渲染插件
-version: v1.6.0
+version: v1.7.0
 author: bvzrays
 repo: https://github.com/bvzrays/astrbot_plugin_chuanhuatong

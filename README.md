@@ -1,11 +1,10 @@
 ## 传话筒（astrbot_plugin_chuanhuatong）
 
-> **当前版本：v1.6.0**
+> **当前版本：v1.7.0**
 
 将 AstrBot 的纯文本回复转换成带立绘的 GalGame 风聊天框图片，支持情绪差分、多层文本、拖拽式 WebUI 布局与自定义组件模板。
 
-<img width="511" height="684" alt="image" src="https://github.com/user-attachments/assets/f84f4295-02fc-430b-b390-fb23758bdd77" />
-
+【这里放整体效果演示图片】
 
 ---
 
@@ -53,8 +52,7 @@
   - 完全基于本地 Pillow 渲染，无需浏览器 / Playwright。
   - 如渲染出错会自动回退为纯文本发送，保证消息不丢失。
 
-<img width="2111" height="1111" alt="image" src="https://github.com/user-attachments/assets/6fc31c10-8c61-480c-93ac-f4b09c4306cc" />
-
+【这里放 WebUI 布局编辑界面截图】
 
 ---
 
@@ -71,8 +69,8 @@
 3. **确认 WebUI 端口**
    - 默认 WebUI 监听：`http://127.0.0.1:18765`
    - 可在配置中修改 `webui_host` / `webui_port`，请确保端口未被其他程序占用。
-<img width="947" height="185" alt="image" src="https://github.com/user-attachments/assets/9318fc9c-cdab-476c-9a1b-4eb2212a5409" />
 
+【这里放 AstrBot 插件列表中显示本插件的截图】
 
 ---
 
@@ -111,8 +109,7 @@
     - `AstrBot/data/plugin_data/astrbot_plugin_chuanhuatong/layout_state.json`
   - 重启 AstrBot 或重新加载插件不会丢失布局；点击“重置布局”可回到插件内置的默认模板。
 
-<img width="343" height="414" alt="image" src="https://github.com/user-attachments/assets/1223e0a0-daf0-43ee-bbc2-86a2faf34599" />
-
+【这里放 WebUI 文本样式编辑区域截图】
 
 ---
 
@@ -144,8 +141,7 @@
   - 如果文本中没有出现任何已知标签，则使用配置项 `default_emotion`。
   - 若 `default_emotion` 无法匹配到有效目录，会使用第一个已启用的情绪作为回退。
 
-<img width="427" height="509" alt="image" src="https://github.com/user-attachments/assets/c11e5cfa-3e53-4d89-af7a-208648effa1f" />
-
+【这里放不同情绪立绘对比的拼图截图】
 
 ---
 
@@ -178,6 +174,8 @@ astrbot_plugin_chuanhuatong/
     - `AstrBot/data/plugins/astrbot_plugin_chuanhuatong/zujian/名称框.png`
   - 这样默认布局中的组件图层就能直接引用这些图片，第一次打开 WebUI 即可看到完整模板布局。
 
+【这里放资源目录结构（资源管理器截图）】
+
 ---
 
 ## 数据与用户上传目录
@@ -198,8 +196,7 @@ AstrBot/data/plugin_data/astrbot_plugin_chuanhuatong/
 - 直接将组件 / 立绘 / 字体文件放入上述目录（及其子目录）也会被 WebUI 识别。
 - 用户上传的组件与字体会与插件内置的文件一起出现在下拉列表中，可在 WebUI 中统一管理。
 
-<img width="653" height="194" alt="image" src="https://github.com/user-attachments/assets/c0ae569b-c8b6-49f0-9047-1913b1a420f9" />
-
+【这里放 data 目录结构截图】
 
 ---
 
@@ -240,37 +237,28 @@ AstrBot/data/plugin_data/astrbot_plugin_chuanhuatong/
 - 未检测到背景或立绘文件时，会自动降级为纯背景 / 无立绘模式，保证消息仍可正常发送。
 - 若在其他插件中也修改了 `event.get_result()` 或拦截消息，请注意插件执行顺序以及 `event.stop_event()` 的使用，避免互相覆盖。
 
-![dfc325accb815446a2b4503599c9efc3_720](https://github.com/user-attachments/assets/41acac86-de9d-4bf1-8acc-3a985affc53f)
-
+【这里放实际聊天窗口中渲染结果的截图】
 
 ---
 
-## 预设模板
-《魔法少女的魔女审判》全角色模板
-请到 https://github.com/bvzrays/astrbot_plugin_chuanhuatong-Magical-Girl-Witch-Trials 下载文件，按教程导入模板
-<img width="1600" height="600" alt="e44d70c03555daa6057b2ac702bd3d43" src="https://github.com/user-attachments/assets/884d770e-0eee-4161-b615-950874369820" />
-<img width="1600" height="600" alt="60e499029f905c74da834b0d1b0a6fc0" src="https://github.com/user-attachments/assets/5ee31341-7946-489a-b9c7-b374d75c346e" />
-<img width="1600" height="600" alt="c74f77dfb7e1ce3180f206da0e8c8a22" src="https://github.com/user-attachments/assets/e8ad30af-57f0-4fdb-be1e-17580de2c797" />
-<img width="1600" height="600" alt="ce38ffc9fb01a02142c8c8453b69e57f" src="https://github.com/user-attachments/assets/04f47594-5712-4035-acc1-5df95f96bed5" />
-<img width="1600" height="600" alt="1417f5d131b57a2ccb09278b056b84ce" src="https://github.com/user-attachments/assets/4bff2383-288d-4c0c-af5e-317a4e9253dc" />
-<img width="1600" height="600" alt="4907720c7bbe1148dfd1aaeb1f02ef45" src="https://github.com/user-attachments/assets/88b12922-e8d3-41ae-87d9-7fabae96dfb1" />
-<img width="1600" height="600" alt="cf0b0ba02c2abc855ca2df975a1f14b2" src="https://github.com/user-attachments/assets/646621e8-6b36-48b8-a754-5d33b4fe087c" />
-<img width="1600" height="600" alt="ec8bd6ccf0f9dd57472b3c92a0ff84fb" src="https://github.com/user-attachments/assets/44b4a9d3-577b-457c-bd79-2a061f170e44" />
-<img width="1600" height="600" alt="4aa64bbae0dd16fd5d644355d553a370" src="https://github.com/user-attachments/assets/686af46c-4339-4772-8923-98b253756e8c" />
-<img width="1600" height="600" alt="6e8d4c78c0d9ed7825e2978ca1040b7c" src="https://github.com/user-attachments/assets/2d936689-63f3-434a-ae90-d430b1e4f6ed" />
-<img width="1600" height="600" alt="16a36d6b7e539163c2a88f24eca77001" src="https://github.com/user-attachments/assets/19e5473c-7687-4d03-91d6-21a79bd88351" />
-<img width="1600" height="600" alt="416687fb4a0c077dd964d599af26a92a" src="https://github.com/user-attachments/assets/6c1aca06-122c-4f8f-ab30-e7f7d07ff158" />
-<img width="1600" height="600" alt="48e77c8ce9ff43b3052eec5dfbd2d3bc" src="https://github.com/user-attachments/assets/d0e0cac4-d0cd-4c5b-b454-3605721b4c98" />
-<img width="1600" height="600" alt="909cadd9d92025668c9954bcf1413d7d" src="https://github.com/user-attachments/assets/3aec06e6-95ea-48fe-8f1c-84469b90abb5" />
-
 ## 更新日志
+
+### v1.7.0
+- 修复指令问题：优化命令符处理逻辑，确保框架配置的命令符正常工作
+- 修复预设导入后立绘错乱：加载预设后自动刷新缓存和角色列表，确保立绘正确显示
+- 修复表情标签清理：在 `on_decorating_result` 钩子中清理 `&xxx&` 格式的情绪标签，确保从文本和对话历史中完全移除
+- 修复换行符保留：优化文本清理逻辑，只清理多余空格，保留所有换行符
+- 修复插件冲突：调整事件钩子优先级，确保与 `continuous_message` 等插件兼容
+- 优化对话历史更新：确保保存到历史的文本是清理后的版本，不包含情绪标签
 
 ### v1.6.0
 - 预设管理面板新增状态提示与“覆盖当前 / 另存为”按钮，应用或保存后会自动刷新角色组与立绘预览。
-- 添加`/切换预设` 指令
+- `/切换预设` 指令兼容 `*切换预设` 等写法，聊天内切换更顺手。
 - “资源上传”区改为卡片式布局，立绘上传时可同时指定角色分组与情绪，流程提示更清晰。
+- README 更新至 v1.6.0，补充新版交互说明。
 
 ### v1.5.0
 - WebUI 上传立绘支持「情绪 / 差分」选择框，自动读取 `emotion_sets` 并可填写自定义目录。
-- 新增“角色分组”，目录结构升级为 `characters/<角色>/<情绪>/文件`；预设可独立选择角色组，渲染时会按角色 + 情绪匹配差分。
+- 新增“角色分组”概念，目录结构升级为 `characters/<角色>/<情绪>/文件`；预设可独立选择角色组，渲染时会按角色 + 情绪匹配差分。
 - 用户立绘会在“预览立绘”选择器中按 `用户/角色/情绪/文件` 展示，便于定位。
+- README、元数据同步到 v1.5.0，文档补充差分上传与目录结构说明。
