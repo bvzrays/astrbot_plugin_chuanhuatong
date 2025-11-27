@@ -4,7 +4,7 @@
 
 > **当前版本：v1.7.0**
 
-![views](https://count.getloli.com/get/@astrbotneteasemusic?theme=booru-jaypee)<br>
+![views](https://count.getloli.com/get/@bvzrays.astrbot_plugin_chuanhuatong?theme=booru-jaypee)
 
 </div>
 
