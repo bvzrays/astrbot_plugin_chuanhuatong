@@ -46,7 +46,7 @@ class EmotionMeta:
 @register(
     "astrbot_plugin_chuanhuatong",
     "bvzrays",
-    "传话筒：将 Bot 的文字回复渲染为 Gal 风立绘对话框",
+    "传话筒：将 Bot 的文字回复渲染为 Gal 风立绘对话框，支持《魔法少女的魔女审判》全人物预设",
     "1.8.0",
     "https://github.com/bvzrays/astrbot_plugin_chuanhuatong",
 )
