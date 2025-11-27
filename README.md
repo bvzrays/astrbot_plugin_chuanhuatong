@@ -1,4 +1,4 @@
-## 传话筒（astrbot_plugin_chuanhuatong）
+##                                          ✨传话筒（astrbot_plugin_chuanhuatong）✨
 
 > **当前版本：v1.7.0**
 
