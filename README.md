@@ -3,7 +3,7 @@
 #  ✨ 传话筒（astrbot_plugin_chuanhuatong）✨
 <img width="200" height="200" alt="image" src="https://github.com/user-attachments/assets/6af41d2d-f0d1-4be5-a656-b1fe748c8a5d" />
 
-## 公网环境请注意配置token！
+## 公网环境请注意配置token！  点个star谢谢喵
 > **当前版本：v1.7.0**
 
 ![views](https://count.getloli.com/get/@astrbotchuanhuatong?theme=booru-jaypee)
