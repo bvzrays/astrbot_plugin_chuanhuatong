@@ -319,6 +319,8 @@ class ChuanHuaTongPlugin(Star):
         self._cleanup_tasks: set[asyncio.Task] = set()
 
         logger.info("[传话筒] 数据目录：%s", self._data_dir)
+        logger.info("[传话筒] 布局文件：%s", self._layout_file)
+        logger.info("[传话筒] 情绪配置：%s", self._emotion_file)
 
     def cfg(self) -> Dict[str, Any]:
         try:
@@ -337,12 +339,15 @@ class ChuanHuaTongPlugin(Star):
         if self._layout_file.exists():
             try:
                 data = json.loads(self._layout_file.read_text(encoding="utf-8"))
-                return self._normalize_layout(data)
+                normalized = self._normalize_layout(data)
+                logger.info("[传话筒] 已载入自定义布局（包含 %s 个覆盖字段）", len(data.keys()))
+                return normalized
             except Exception:
                 logger.warning("[传话筒] 无法读取自定义布局，使用默认布局。")
         legacy = self.cfg().get("text_layout") or {}
         state = self._normalize_layout(self._convert_legacy_layout(legacy))
         self._save_layout_state(state)
+        logger.info("[传话筒] 使用默认布局并写入到 %s", self._layout_file)
         return state
 
     def _save_layout_state(self, layout: Dict[str, Any]):
@@ -355,12 +360,14 @@ class ChuanHuaTongPlugin(Star):
         state = self._normalize_layout(copy.deepcopy(self.DEFAULT_LAYOUT))
         self._save_layout_state(state)
         self._layout_state = state
+        logger.info("[传话筒] 布局已重置为默认值")
         return state
 
     def _set_layout_state(self, layout: Dict[str, Any]):
         normalized = self._normalize_layout(layout)
         self._layout_state = normalized
         self._save_layout_state(normalized)
+        logger.info("[传话筒] 布局已更新并持久化，文本层数：%s", len(normalized.get("text_overlays", [])))
 
     def _sanitize_preset_name(self, name: str) -> str:
         name = str(name or "").strip()
@@ -834,6 +841,11 @@ class ChuanHuaTongPlugin(Star):
     def _persist_emotion_sets(self, records: list[dict[str, Any]] | None) -> list[dict[str, Any]]:
         normalized = self._normalize_emotion_records(records)
         self._write_emotion_file(normalized)
+        logger.info(
+            "[传话筒] 情绪配置已写入，共 %s 个标签（启用 %s 个）",
+            len(normalized),
+            sum(1 for item in normalized if item.get("enabled")),
+        )
         return normalized
 
     def _load_emotion_sets(self) -> Dict[str, EmotionMeta]:
@@ -842,8 +854,10 @@ class ChuanHuaTongPlugin(Star):
             src = self.cfg().get("emotion_sets")
             if isinstance(src, list) and src:
                 records = src
+                logger.info("[传话筒] 从配置加载 %s 个情绪标签", len(records))
             else:
                 records = copy.deepcopy(self.DEFAULT_EMOTIONS)
+                logger.info("[传话筒] 使用内置默认情绪标签")
         records = self._persist_emotion_sets(records)
         self._emotion_records = records
         prepared: Dict[str, EmotionMeta] = {}
@@ -1495,6 +1509,7 @@ class ChuanHuaTongPlugin(Star):
 
     async def _ensure_webui(self):
         if not self._cfg_bool("webui_enabled", True):
+            logger.info("[传话筒] WebUI 被禁用，跳过启动。")
             return
         async with self._web_lock:
             if self._web_runner:
@@ -1533,6 +1548,7 @@ class ChuanHuaTongPlugin(Star):
     async def initialize(self):
         await self._ensure_webui()
         self._emotion_meta()
+        logger.info("[传话筒] 插件初始化完成，已准备情绪与布局。")
 
     async def terminate(self):
         async with self._web_lock:
@@ -1543,6 +1559,7 @@ class ChuanHuaTongPlugin(Star):
                 await self._web_runner.cleanup()
                 self._web_runner = None
             self._web_app = None
+        logger.info("[传话筒] 插件已终止，WebUI 关闭。")
 
     def _get_token(self) -> str:
         return str(self.cfg().get("webui_token", "")).strip()
@@ -1821,6 +1838,7 @@ class ChuanHuaTongPlugin(Star):
         normalized = self._persist_emotion_sets(records)
         self._emotion_records = normalized
         self._cached_emotions.clear()
+        logger.info("[传话筒] WebUI 已保存情绪配置")
         return web.json_response({
             "ok": True,
             "emotion_sets": self._emotion_payload(),
@@ -1831,6 +1849,7 @@ class ChuanHuaTongPlugin(Star):
         normalized = self._persist_emotion_sets(copy.deepcopy(self.DEFAULT_EMOTIONS))
         self._emotion_records = normalized
         self._cached_emotions.clear()
+        logger.info("[传话筒] WebUI 请求恢复默认情绪配置")
         return web.json_response({
             "ok": True,
             "emotion_sets": self._emotion_payload(),
@@ -1947,6 +1966,7 @@ class ChuanHuaTongPlugin(Star):
             emotion, cleaned_full_text = self._emotion_from_text(raw_full_text)
             full_text = cleaned_full_text.strip()
             if full_text:
+                logger.debug("[传话筒] 触发渲染，情绪=%s，长度=%s", emotion, len(full_text))
                 await self._update_conversation_history(event, full_text)
                 
                 # 检查字符限制
