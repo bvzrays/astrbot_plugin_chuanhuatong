@@ -1,7 +1,7 @@
 <div align="center">
 
-## ✨ 传话筒（astrbot_plugin_chuanhuatong）✨
-# 公网环境请注意配置token！
+#  ✨ 传话筒（astrbot_plugin_chuanhuatong）✨
+## 公网环境请注意配置token！
 > **当前版本：v1.7.0**
 
 ![views](https://count.getloli.com/get/@astrbotchuanhuatong?theme=booru-jaypee)
