@@ -6,7 +6,8 @@
 ## 公网环境请注意配置token！
 > **当前版本：v1.7.0**
 
-![views](https://count.getloli.com/get/@astrbotchuanhuatong?theme=booru-jaypee)
+<img width="525" height="238" alt="image" src="https://github.com/user-attachments/assets/b9a86fcb-8621-4191-941f-55013090d118" />
+
 
 </div>
 
