@@ -83,7 +83,7 @@
       { "key": "sad", "folder": "sad", "label": "低落", "color": "#7DA1FF", "enabled": true },
       { "key": "shy", "folder": "shy", "label": "害羞", "color": "#F9C5D1", "enabled": true },
       { "key": "surprise", "folder": "surprise", "label": "惊讶", "color": "#F5E960", "enabled": true },
-      { "key": "angry", "folder": "sad", "label": "生气", "color": "#FF8A8A", "enabled": true }
+      { "key": "angry", "folder": "angry", "label": "生气", "color": "#FF8A8A", "enabled": true }
     ],
     "items": {
       "type": "object",
@@ -96,4 +96,5 @@
       }
     }
   }
+
 }
