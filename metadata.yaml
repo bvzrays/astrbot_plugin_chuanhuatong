@@ -1,6 +1,6 @@
 name: astrbot_plugin_chuanhuatong
 display_name: 传话筒·立绘对话框
-desc: 拦截 Bot 文本输出，套用 Gal 风气泡和立绘的渲染插件，内置《魔法少女的魔女审判》全角色预设
+desc: 传话筒：将 Bot 的文字回复渲染为 Gal 风立绘对话框，支持《魔法少女的魔女审判》全人物预设
 version: v1.8.0
 author: bvzrays
 repo: https://github.com/bvzrays/astrbot_plugin_chuanhuatong
