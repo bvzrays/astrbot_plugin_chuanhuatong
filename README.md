@@ -7,8 +7,6 @@
 ![GitHub forks](https://img.shields.io/github/forks/bvzrays/astrbot_plugin_chuanhuatong?style=for-the-badge&logo=github&logoColor=white&color=4ECDC4)
 ![GitHub watchers](https://img.shields.io/github/watchers/bvzrays/astrbot_plugin_chuanhuatong?style=for-the-badge&logo=github&logoColor=white&color=FFE66D)
 
-![visitors](https://visitor-badge.laobi.icu/badge?page_id=bvzrays.astrbot_plugin_chuanhuatong&left_color=FF6B9D&right_color=4ECDC4&left_text=访问量&right_text=Visitors)
-
 </div>
 将 AstrBot 的纯文本回复转换成带立绘的 GalGame 风聊天框图片，支持情绪差分、多层文本、拖拽式 WebUI 布局与自定义组件模板。
 
