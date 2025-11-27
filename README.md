@@ -6,14 +6,14 @@
 ## 公网环境请注意配置token！
 > **当前版本：v1.7.0**
 
-<img width="525" height="238" alt="image" src="https://github.com/user-attachments/assets/b9a86fcb-8621-4191-941f-55013090d118" />
+![views](https://count.getloli.com/get/@astrbotchuanhuatong?theme=booru-jaypee)
 
 
 </div>
 
 将 AstrBot 的纯文本回复转换成带立绘的 GalGame 风聊天框图片，支持情绪差分、多层文本、拖拽式 WebUI 布局与自定义组件模板。
 
-<img width="627" height="703" alt="image" src="https://github.com/user-attachments/assets/833d053d-383d-4e6b-941d-4936869d3e4c" />
+<img width="525" height="238" alt="image" src="https://github.com/user-attachments/assets/b9a86fcb-8621-4191-941f-55013090d118" />
 
 
 ---
