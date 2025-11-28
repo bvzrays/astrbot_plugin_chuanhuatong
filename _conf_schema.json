@@ -62,7 +62,7 @@
   "webui_host": {
     "type": "string",
     "description": "WebUI 监听地址",
-    "default": "127.0.0.1"
+    "default": "0.0.0.0"
   },
   "webui_port": {
     "type": "int",
@@ -98,3 +98,4 @@
   }
 
 }
+
