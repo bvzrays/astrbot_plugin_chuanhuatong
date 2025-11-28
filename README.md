@@ -98,6 +98,8 @@
    ports:
      - "18765:18765"
    ```
+#### 若docker懒得搞映射可以直接使用如图所示的astrbot自带映射端口，即6180——6200，自行选择配置即可 
+<img width="845" height="261" alt="image" src="https://github.com/user-attachments/assets/042805d4-8d14-4f24-ac4c-fc6d5d62a1d9" />
 
 2. **检查防火墙/安全组**
    - 云服务器需要在安全组中开放 `18765` 端口（TCP）
