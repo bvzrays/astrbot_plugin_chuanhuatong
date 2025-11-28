@@ -83,6 +83,40 @@
 <img width="1004" height="1079" alt="image" src="https://github.com/user-attachments/assets/f1af9e28-2d45-4a4b-9c51-1dfbdbd746cd" />
 
 
+## Docker/云服务器部署
+
+### WebUI 远程访问配置
+
+插件默认配置为 `webui_host: 0.0.0.0`，支持远程访问。在 Docker 环境下：
+
+1. **确保端口映射**
+   ```bash
+   docker run -p 18765:18765 ...
+   ```
+   或使用 docker-compose：
+   ```yaml
+   ports:
+     - "18765:18765"
+   ```
+
+2. **检查防火墙/安全组**
+   - 云服务器需要在安全组中开放 `18765` 端口（TCP）
+   - 本地防火墙也需要允许该端口
+
+3. **访问地址**
+   - 通过 `http://<服务器IP>:18765` 访问
+   - 如果设置了 `webui_token`，访问时需携带：`http://<服务器IP>:18765?token=你的token`
+
+4. **安全建议**
+   - 公网环境**强烈建议**设置 `webui_token`，避免未授权访问
+   - 如需限制为仅本地访问，将 `webui_host` 设置为 `127.0.0.1`
+
+### 常见问题
+
+- **无法远程访问**：检查 `webui_host` 是否为 `0.0.0.0`（默认已设置）
+- **端口被占用**：修改 `webui_port` 配置或检查容器端口映射
+- **连接被拒绝**：检查防火墙/安全组规则
+
 ---
 
 ## WebUI 布局编辑器
