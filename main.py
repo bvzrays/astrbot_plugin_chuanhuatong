@@ -23,8 +23,10 @@ from PIL import Image, ImageDraw, ImageFilter, ImageFont
 
 try:
     from pilmoji import Pilmoji
+    from pilmoji.source import Twemoji
 except Exception:
     Pilmoji = None
+    Twemoji = None
 
 PLAIN_COMPONENT_TYPES = tuple(
     getattr(Comp, name)
@@ -32,6 +34,8 @@ PLAIN_COMPONENT_TYPES = tuple(
     if hasattr(Comp, name)
 )
 LINEBREAK_COMPONENT = getattr(Comp, "LineBreak", None)
+
+IMAGE_SUFFIXES = {".png", ".jpg", ".jpeg", ".webp"}
 
 
 @dataclass
@@ -47,7 +51,7 @@ class EmotionMeta:
     "astrbot_plugin_chuanhuatong",
     "bvzrays",
     "传话筒：将 Bot 的文字回复渲染为 Gal 风立绘对话框",
-    "1.8.0",
+    "2.0.0",
     "https://github.com/bvzrays/astrbot_plugin_chuanhuatong",
 )
 class ChuanHuaTongPlugin(Star):
@@ -99,8 +103,13 @@ class ChuanHuaTongPlugin(Star):
         "character_bottom": 0,
         "character_width": 499.72719967439286,
         "character_z_index": 140,
+        "character_fit_mode": "fixed_width",
+        "character_uniform_height": 620,
+        "character_align_bottom": True,
+        "character_top": 0,
         "character_role": "__auto__",
         "character_shadow": "drop-shadow(0 12px 36px rgba(0,0,0,0.6))",
+        "background_group": "__auto__",
         "text_overlays": [
             {
                 "id": "ov_1764055391684",
@@ -298,6 +307,8 @@ class ChuanHuaTongPlugin(Star):
         self._font_dir.mkdir(parents=True, exist_ok=True)
         self._user_char_dir = self._data_dir / "characters"
         self._user_char_dir.mkdir(parents=True, exist_ok=True)
+        self._user_bg_dir = self._data_dir / "backgrounds"
+        self._user_bg_dir.mkdir(parents=True, exist_ok=True)
         self._presets_dir = self._data_dir / "presets"
         self._presets_dir.mkdir(parents=True, exist_ok=True)
         self._current_preset_file = self._data_dir / "current_preset.json"
@@ -784,14 +795,78 @@ class ChuanHuaTongPlugin(Star):
                 return str(candidate)
         return None
 
-    def _list_backgrounds(self) -> list[str]:
+    def _count_images_in_dir(self, directory: Path) -> int:
         try:
-            return sorted([
-                f.name for f in self._bg_dir.iterdir()
-                if f.is_file() and f.suffix.lower() in {".png", ".jpg", ".jpeg", ".webp"}
-            ])
+            return sum(1 for f in directory.iterdir() if f.is_file() and f.suffix.lower() in IMAGE_SUFFIXES)
         except Exception:
-            return []
+            return 0
+
+    def _list_background_groups(self) -> list[dict[str, Any]]:
+        groups: list[dict[str, Any]] = []
+        builtin_count = self._count_images_in_dir(self._bg_dir)
+        if builtin_count:
+            groups.append({"id": "builtin", "label": "内置背景", "count": builtin_count})
+        try:
+            for folder in sorted(self._user_bg_dir.iterdir()):
+                if not folder.is_dir():
+                    continue
+                count = self._count_images_in_dir(folder)
+                if count:
+                    groups.append({
+                        "id": f"user::{folder.name}",
+                        "label": folder.name,
+                        "count": count,
+                    })
+        except Exception:
+            logger.debug("[传话筒] 列出背景分组失败", exc_info=True)
+        return groups
+
+    def _list_backgrounds(self) -> list[str]:
+        entries: list[str] = []
+        try:
+            for f in self._bg_dir.iterdir():
+                if f.is_file() and f.suffix.lower() in IMAGE_SUFFIXES:
+                    entries.append(f"builtin::{f.name}")
+        except Exception:
+            pass
+        try:
+            for folder in self._user_bg_dir.iterdir():
+                if not folder.is_dir():
+                    continue
+                for f in folder.iterdir():
+                    if f.is_file() and f.suffix.lower() in IMAGE_SUFFIXES:
+                        entries.append(f"user::{folder.name}::{f.name}")
+        except Exception:
+            logger.debug("[传话筒] 列出背景资源失败", exc_info=True)
+        return sorted(entries)
+
+    def _pick_background_path(self, group: Optional[str] = None) -> str:
+        target = (group or "__auto__").strip()
+        if target and target not in {"__auto__", "__random__"}:
+            if target == "builtin":
+                path = self._pick_random_asset(self._bg_dir, IMAGE_SUFFIXES)
+                if path:
+                    return path
+            elif target.startswith("user::"):
+                slug = self._sanitize_folder_name(target.split("::", 1)[1] if "::" in target else target, "default")
+                directory = self._user_bg_dir / slug
+                if directory.exists():
+                    path = self._pick_random_asset(directory, IMAGE_SUFFIXES)
+                    if path:
+                        return path
+        user_dirs: list[Path] = []
+        try:
+            for folder in self._user_bg_dir.iterdir():
+                if folder.is_dir() and self._count_images_in_dir(folder):
+                    user_dirs.append(folder)
+        except Exception:
+            pass
+        if user_dirs:
+            directory = random.choice(user_dirs)
+            path = self._pick_random_asset(directory, IMAGE_SUFFIXES)
+            if path:
+                return path
+        return self._pick_random_asset(self._bg_dir, IMAGE_SUFFIXES)
 
     def _read_emotion_file(self) -> Optional[list[dict[str, Any]]]:
         if not self._emotion_file.exists():
@@ -960,8 +1035,8 @@ class ChuanHuaTongPlugin(Star):
             return ""
         return self._file_to_data_url(Path(path))
 
-    def _random_background_data(self) -> str:
-        path = self._pick_random_asset(self._bg_dir, {".png", ".jpg", ".jpeg", ".webp"})
+    def _random_background_data(self, group: Optional[str] = None) -> str:
+        path = self._pick_background_path(group)
         self._last_background_path = path or ""
         return self._path_to_data_url(path)
 
@@ -1073,17 +1148,33 @@ class ChuanHuaTongPlugin(Star):
             return ""
         return random.choice(files)
 
-    def _resolve_background_asset(self, asset: str | None) -> str:
+    def _resolve_background_asset(self, asset: str | None, group: Optional[str] = None) -> str:
         name = str(asset or "").strip()
         if name and name not in {"__auto__", "__random__"}:
             path = self._resolve_background_file(name)
             if path:
+                self._last_background_path = path
                 return path
-        path = self._pick_random_asset(self._bg_dir, {".png", ".jpg", ".jpeg", ".webp"})
+        path = self._pick_background_path(group)
         self._last_background_path = path or ""
         return path or ""
 
     def _resolve_background_file(self, name: str) -> str:
+        if not name:
+            return ""
+        if name.startswith("user::"):
+            parts = name.split("::", 2)
+            if len(parts) >= 3:
+                group = self._sanitize_folder_name(parts[1], "default")
+                filename = Path(parts[2]).name
+                target = self._user_bg_dir / group / filename
+                if target.exists():
+                    return str(target)
+        elif name.startswith("builtin::"):
+            safe = Path(name.split("::", 1)[1]).name
+            candidate = self._bg_dir / safe
+            if candidate.exists():
+                return str(candidate)
         safe = Path(name).name
         candidate = self._bg_dir / safe
         if candidate.exists():
@@ -1092,6 +1183,9 @@ class ChuanHuaTongPlugin(Star):
             candidate = directory / safe
             if candidate.exists():
                 return str(candidate)
+        candidate = self._user_bg_dir / safe
+        if candidate.exists():
+            return str(candidate)
         return ""
 
     def _resolve_character_file(self, name: str) -> str:
@@ -1219,7 +1313,10 @@ class ChuanHuaTongPlugin(Star):
         bg_color = self._hex_or_rgba(layout.get("background_color", "#05060A"))
         canvas = Image.new("RGBA", (width, height), bg_color)
 
-        bg_path = self._resolve_background_asset(layout.get("background_asset"))
+        bg_path = self._resolve_background_asset(
+            layout.get("background_asset"),
+            layout.get("background_group"),
+        )
         if bg_path:
             try:
                 bg_img = Image.open(bg_path).convert("RGBA").resize((width, height), Image.LANCZOS)
@@ -1264,13 +1361,22 @@ class ChuanHuaTongPlugin(Star):
             return
         try:
             img = Image.open(path).convert("RGBA")
-            target_w = max(1, int(layout.get("character_width", 520)))
-            ratio = target_w / max(1, img.width)
-            target_h = max(1, int(img.height * ratio))
+            fit_mode = str(layout.get("character_fit_mode", "fixed_width"))
+            if fit_mode == "uniform_height":
+                target_h = max(1, int(layout.get("character_uniform_height", img.height)))
+                ratio = target_h / max(1, img.height)
+                target_w = max(1, int(img.width * ratio))
+            else:
+                target_w = max(1, int(layout.get("character_width", 520)))
+                ratio = target_w / max(1, img.width)
+                target_h = max(1, int(img.height * ratio))
             img = img.resize((target_w, target_h), Image.LANCZOS)
             left = int(layout.get("character_left", 40))
-            bottom = int(layout.get("character_bottom", 0))
-            top = max(0, canvas.height - target_h - bottom)
+            if layout.get("character_align_bottom", True):
+                bottom = int(layout.get("character_bottom", 0))
+                top = max(0, canvas.height - target_h - bottom)
+            else:
+                top = max(0, int(layout.get("character_top", 0)))
             canvas.alpha_composite(img, (left, top))
         except Exception:
             logger.debug("[传话筒] 立绘渲染失败", exc_info=True)
@@ -1288,9 +1394,9 @@ class ChuanHuaTongPlugin(Star):
     ):
         if not text:
             return
-        if Pilmoji:
+        if Pilmoji and Twemoji:
             try:
-                with Pilmoji(canvas) as pilmoji:
+                with Pilmoji(canvas, source=Twemoji) as pilmoji:
                     pilmoji.text(
                         position,
                         text,
@@ -1611,6 +1717,7 @@ class ChuanHuaTongPlugin(Star):
             "character_roles": self._list_character_roles(),
             "fonts": self._list_fonts(),
             "backgrounds": self._list_backgrounds(),
+            "background_groups": self._list_background_groups(),
             "presets": self._list_presets(),
             "bot_name": self._bot_name(),
             "emotion_sets": emotion_payload,
@@ -1624,8 +1731,9 @@ class ChuanHuaTongPlugin(Star):
     async def _handle_preview_assets(self, request: web.Request):
         await self._authorize(request)
         role = str(request.query.get("role", "")).strip() or None
+        bg_group = str(request.query.get("bg_group", "")).strip() or None
         preview = {
-            "background": self._random_background_data(),
+            "background": self._random_background_data(bg_group),
             "character": self._preview_character(role),
         }
         return web.json_response(preview)
@@ -1747,6 +1855,7 @@ class ChuanHuaTongPlugin(Star):
         kind = "component"
         emotion_from_form = ""
         role_from_form = ""
+        bg_group_from_form = ""
         if "multipart/form-data" in content_type:
             form = await request.post()
             file_field = form.get("file")
@@ -1756,6 +1865,7 @@ class ChuanHuaTongPlugin(Star):
             kind = str(form.get("kind") or "component").lower()
             emotion_from_form = str(form.get("emotion") or "").strip()
             role_from_form = str(form.get("role") or "").strip()
+            bg_group_from_form = str(form.get("background_group") or "").strip()
             binary_data = file_field.file.read()
         else:
             try:
@@ -1773,6 +1883,7 @@ class ChuanHuaTongPlugin(Star):
                 raise web.HTTPBadRequest(text="invalid data")
             emotion_from_form = str((payload or {}).get("emotion") or "").strip()
             role_from_form = str((payload or {}).get("role") or "").strip()
+            bg_group_from_form = str((payload or {}).get("background_group") or "").strip()
         if kind == "font":
             allowed = (".ttf", ".ttc", ".otf")
             target_dir = self._font_dir
@@ -1781,6 +1892,11 @@ class ChuanHuaTongPlugin(Star):
             emotion_folder = self._sanitize_folder_name(emotion_from_form or "custom", "custom")
             role_folder = self._sanitize_role_name(role_from_form or "general", "general")
             target_dir = self._user_char_dir / role_folder / emotion_folder
+            target_dir.mkdir(parents=True, exist_ok=True)
+        elif kind == "background":
+            allowed = (".png", ".jpg", ".jpeg", ".webp")
+            group_folder = self._sanitize_folder_name(bg_group_from_form or "default", "default")
+            target_dir = self._user_bg_dir / group_folder
             target_dir.mkdir(parents=True, exist_ok=True)
         else:
             allowed = (".png", ".webp", ".gif")
@@ -1801,6 +1917,8 @@ class ChuanHuaTongPlugin(Star):
             "components": self._list_components(),
             "fonts": self._list_fonts(),
             "characters": self._list_characters(),
+            "backgrounds": self._list_backgrounds(),
+            "background_groups": self._list_background_groups(),
         })
 
     async def _handle_component_file(self, request: web.Request):
@@ -1937,16 +2055,22 @@ class ChuanHuaTongPlugin(Star):
         if not self._cfg_bool("enable_render", True):
             return
         
+        render_scope = str(self.cfg().get("render_scope", "llm_only")).lower()
+        allow_non_llm = render_scope == "all_text"
+
         # 获取保存的响应对象
         resp = event.get_extra("llm_resp")
-        if isinstance(resp, LLMResponse):
+        resp_obj = resp if isinstance(resp, LLMResponse) else None
+        if resp_obj is None and not allow_non_llm:
+            return
+        if resp_obj:
             # 清理响应文本中的表情标签（参考 meme_manager_lite）
-            if hasattr(resp, "completion_text") and resp.completion_text:
-                resp.completion_text = self._remove_emotion_tags(resp.completion_text)
-            elif hasattr(resp, "text") and resp.text:
-                resp.text = self._remove_emotion_tags(resp.text)
-            elif hasattr(resp, "content") and resp.content:
-                resp.content = self._remove_emotion_tags(resp.content)
+            if hasattr(resp_obj, "completion_text") and resp_obj.completion_text:
+                resp_obj.completion_text = self._remove_emotion_tags(resp_obj.completion_text)
+            elif hasattr(resp_obj, "text") and resp_obj.text:
+                resp_obj.text = self._remove_emotion_tags(resp_obj.text)
+            elif hasattr(resp_obj, "content") and resp_obj.content:
+                resp_obj.content = self._remove_emotion_tags(resp_obj.content)
         
         # 获取当前结果并清理消息链中的文本
         result = event.get_result()
@@ -1983,7 +2107,8 @@ class ChuanHuaTongPlugin(Star):
             full_text = cleaned_full_text.strip()
             if full_text:
                 logger.debug("[传话筒] 触发渲染，情绪=%s，长度=%s", emotion, len(full_text))
-                await self._update_conversation_history(event, full_text)
+                if resp_obj is not None:
+                    await self._update_conversation_history(event, full_text)
                 
                 # 检查字符限制
                 char_limit = int(self.cfg().get("render_char_threshold", 60) or 0)
