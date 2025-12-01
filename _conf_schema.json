@@ -4,6 +4,12 @@
     "description": "拦截纯文本回复并渲染为图片",
     "default": true
   },
+  "render_scope": {
+    "type": "string",
+    "description": "渲染范围：llm_only=仅渲染 LLM 回复；all_text=渲染所有纯文本回复",
+    "default": "llm_only",
+    "options": ["llm_only", "all_text"]
+  },
 
   "render_char_threshold": {
     "type": "int",
