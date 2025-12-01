@@ -4,13 +4,7 @@
 <img width="200" height="200" alt="image" src="https://github.com/user-attachments/assets/6af41d2d-f0d1-4be5-a656-b1fe748c8a5d" />
 
 ## 公网环境请注意配置token！  点个star谢谢喵
-> **当前版本：v1.8.0
-> 下版本（v2.0.0）更新：
-> 1.添加不同的立绘显示方式配置（自动缩放到同一大小，是否同底等，防止像素导致的大小不一致）
-> 2.chat history注入修改
-> 3.优先级配置开关（是否仅渲染llm回复为图片）
-> 4.emoji渲染支持
-> 5.背景图支持分组上传，而非单一的插件目录自带背景图**
+> **当前版本：v2.0.0**
 
 
 ![views](https://count.getloli.com/get/@astrbotchuanhuatong?theme=booru-jaypee)
@@ -308,6 +302,11 @@ AstrBot/data/plugin_data/astrbot_plugin_chuanhuatong/
 
 
 ## 更新日志
+
+### v2.0.0
+- **立绘显示方式**：新增“固定宽度 / 统一高度 + 同底/顶部偏移”配置，解决像素不一导致的差分尺寸不一致的问题
+- **背景分组**：支持自定义分组与批量上传背景，可在 WebUI 中指定仅使用某一组，默认为所有
+- **渲染优先级**：新增 `render_scope` 配置，可选仅渲染 LLM 回复或所有文本回复
 
 ### v1.8.0
 - **标签完全清洗**：移除 `&xxx&` 后会自动剔除多余换行，渲染正文不再下移，同时能正确匹配对应情绪立绘。
