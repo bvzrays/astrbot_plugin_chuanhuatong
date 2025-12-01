@@ -11,6 +11,8 @@
 > 3.优先级配置开关（是否仅渲染llm回复为图片）
 > 4.emoji渲染支持
 > 5.背景图支持分组上传，而非单一的插件目录自带背景图**
+
+
 ![views](https://count.getloli.com/get/@astrbotchuanhuatong?theme=booru-jaypee)
 
 
