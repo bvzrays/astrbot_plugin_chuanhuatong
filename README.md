@@ -4,7 +4,7 @@
 <img width="200" height="200" alt="image" src="https://github.com/user-attachments/assets/6af41d2d-f0d1-4be5-a656-b1fe748c8a5d" />
 
 ## 公网环境请注意配置token！  点个star谢谢喵
-## ✨预设市场： https://bvzrays.xyz （开发中！不可使用！现在下载有bug下载不了组件立绘）✨
+## ✨预设市场： https://bvzrays.xyz （开发中！可正常使用但是可能会有数据清理）✨
 > **当前版本：v2.0.0**
 
 
