@@ -15,6 +15,7 @@ from typing import Any, Dict, List, Optional, Tuple
 from astrbot.api import logger
 from astrbot.api.event import AstrMessageEvent
 from astrbot.core.message.message_event_result import MessageChain
+import astrbot.api.message_components as Comp
 from PIL import Image, ImageDraw, ImageFont
 
 from mixin_config import IMAGE_SUFFIXES
@@ -837,11 +838,11 @@ class RenderMixin:
         session_id: Optional[str] = None,
         persona_id: Optional[str] = None,
     ) -> bool:
-        char_limit = int(self.cfg().get("render_char_threshold", 60) or 0)
-        if char_limit <= 0:
-            char_limit = 200
+        split_page_limit = int(self.cfg().get("split_page_char_limit", 200) or 0)
+        if split_page_limit <= 0:
+            split_page_limit = 200
 
-        chunks_with_emotion = self._split_text_with_emotion(text, char_limit, emotion)
+        chunks_with_emotion = self._split_text_with_emotion(text, split_page_limit, emotion)
 
         if not chunks_with_emotion:
             return False
@@ -938,6 +939,44 @@ class RenderMixin:
             logger.info("[传话筒] 合并图片发送完成")
             return success_count > 0
 
+        # merge_split_images=false：使用合并转发发送多张图片
+        if len(rendered_images) > 1:
+            from astrbot.api.message_components import Node, Nodes
+
+            nodes_list = []
+            for image_path in rendered_images:
+                node = Node(
+                    name="传话筒",
+                    uin="0",
+                    content=[Comp.Image.fromFileSystem(image_path)]
+                )
+                nodes_list.append(node)
+
+            try:
+                nodes = Nodes(nodes=nodes_list)
+                chain = MessageChain([nodes])
+                await event.send(chain)
+                for path in rendered_images:
+                    self._schedule_cleanup(path, delay=90.0)
+                await self._send_fallback_texts(fallback_texts, event)
+                logger.info("[传话筒] 合并转发发送完成，共 %s 张图片", len(rendered_images))
+                return True
+            except Exception:
+                logger.error("[传话筒] 合并转发发送失败，降级为逐图发送", exc_info=True)
+                # 降级为逐图发送
+                for image_path in rendered_images:
+                    try:
+                        chain = MessageChain()
+                        chain.file_image(image_path)
+                        await event.send(chain)
+                        self._schedule_cleanup(image_path, delay=90.0)
+                    except Exception:
+                        logger.error("[传话筒] 逐图发送失败", exc_info=True)
+
+                await self._send_fallback_texts(fallback_texts, event)
+                return len(rendered_images) > 0
+
+        # 单张图片直接发送
         for image_path in rendered_images:
             try:
                 chain = MessageChain()

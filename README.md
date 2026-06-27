@@ -5,7 +5,7 @@
 
 ## 公网环境请注意配置token！  点个star谢谢喵
 ## ✨ BUG反馈群：870543663 ✨
-> **当前版本：v2.4.5**
+> **当前版本：v2.4.9**
 
 ![views](https://count.getloli.com/get/@astrbotchuanhuatong?theme=booru-jaypee)
 

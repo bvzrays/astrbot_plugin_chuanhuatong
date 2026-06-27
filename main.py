@@ -14,9 +14,13 @@ from typing import Any, Dict, Optional, Tuple
 
 # Ensure the plugin directory is on sys.path so absolute imports work
 # both under AstrBot's import_module() and standard Python.
-_PLUGIN_DIR = os.path.dirname(os.path.abspath(__file__))
-if _PLUGIN_DIR not in sys.path:
-    sys.path.insert(0, _PLUGIN_DIR)
+_PLUGIN_DIR = Path(os.path.abspath(__file__)).parent
+if str(_PLUGIN_DIR) not in sys.path:
+    sys.path.insert(0, str(_PLUGIN_DIR))
+
+# 静态路径（类属性，供 WebUIMixin 使用）
+WEB_INDEX_PATH = _PLUGIN_DIR / "webui" / "index.html"
+WEBUI_DIR = _PLUGIN_DIR / "webui"
 
 import yaml
 from aiohttp import web
@@ -82,7 +86,8 @@ class ChuanHuaTongPlugin(
     ROLE_BUILTIN = "__builtin__"
     ROLE_LEGACY = "__legacy__"
 
-    WEB_INDEX_PATH = Path(__file__).with_name("webui").joinpath("index.html")
+    WEB_INDEX_PATH = (Path(__file__).resolve().parent / "webui" / "index.html")
+    WEBUI_DIR = (Path(__file__).resolve().parent / "webui")
 
     DEFAULT_EMOTIONS = [
         {"key": "neutral", "folder": "shy", "label": "平静", "color": "#A9C5FF", "enabled": True},
@@ -131,27 +136,12 @@ class ChuanHuaTongPlugin(
         self._session_layouts_dir = self._data_dir / "session_layouts"
         self._session_layouts_dir.mkdir(parents=True, exist_ok=True)
         self._emotion_file = self._data_dir / "emotion_sets.json"
-        self._whitelist_file = self._data_dir / "whitelist.json"
         self._layout_lock = asyncio.Lock()
         self._layout_state = self._load_layout_state()
 
-        # 内联同步白名单（避免 MRO 查找失败）
-        whitelist = self._load_whitelist()
-        changed = False
-        whitelist_users = str(self.cfg().get("whitelist_users", "") or "").strip()
-        if whitelist_users:
-            for uid in [u.strip() for u in whitelist_users.split(",") if u.strip()]:
-                if uid not in whitelist:
-                    whitelist.add(uid)
-                    changed = True
-        blacklist_users = str(self.cfg().get("blacklist_users", "") or "").strip()
-        if blacklist_users:
-            for uid in [u.strip() for u in blacklist_users.split(",") if u.strip()]:
-                if uid not in whitelist:
-                    whitelist.add(uid)
-                    changed = True
-        if changed:
-            self._save_whitelist(whitelist)
+        # 指令强制状态（内存，不持久化，优先级最高）
+        self._force_enabled_sessions: set[str] = set()
+        self._force_disabled_sessions: set[str] = set()
 
         self._web_runner: Optional[web.AppRunner] = None
         self._web_site: Optional[web.TCPSite] = None
@@ -390,103 +380,123 @@ class ChuanHuaTongPlugin(
         if emotion_tag:
             event.set_extra("extracted_emotion_tag", emotion_tag)
 
+    def _debug_enabled(self) -> bool:
+        return self._cfg_bool("debug", False)
+
+    def _debug_log(self, msg: str, *args):
+        if self._debug_enabled():
+            logger.info(msg, *args)
+
     @filter.on_decorating_result(priority=-10)
     async def on_decorating_result(self, event: AstrMessageEvent):
         import astrbot.api.message_components as Comp
         PLAIN_COMPONENT_TYPES = tuple(
             getattr(Comp, name)
-            for name in ("Plain", "Text")
+            for name in ("Plain", "Text", "LineBreak")
             if hasattr(Comp, name)
         )
 
         session_id = event.unified_msg_origin
         persona_id = await self._resolve_current_persona_id(event, None)
-        logger.debug("[传话筒] on_decorating_result 触发，会话: %s，人格: %s", session_id, persona_id)
+        self._debug_log("[传话筒][DIAG] ========== on_decorating_result 触发 ==========")
+        self._debug_log("[传话筒][DIAG] 会话: %s, 人格: %s", session_id, persona_id)
 
         result = event.get_result()
         if not result:
-            logger.debug("[传话筒] 未获取到结果对象，跳过处理")
+            self._debug_log("[传话筒][DIAG] 步骤1: 未获取到结果对象 → 直接返回")
             return
         chain = result.chain
         if not chain:
-            logger.debug("[传话筒] 消息链为空，跳过处理")
+            self._debug_log("[传话筒][DIAG] 步骤2: 消息链为空 → 直接返回")
             return
 
-        logger.debug("[传话筒] 开始处理消息链，链长度: %s", len(chain))
+        self._debug_log("[传话筒][DIAG] 步骤3: 消息链长度: %s", len(chain))
 
-        has_non_text = False
-        raw_text_parts = []
+        plain_text = self._chain_to_plain_text(chain)
+        has_non_text = plain_text is None
+        raw_text_parts = [plain_text] if plain_text else []
 
-        for item in chain:
-            if isinstance(item, PLAIN_COMPONENT_TYPES):
-                text = getattr(item, "text", "") or ""
-                raw_text_parts.append(text)
-            else:
-                has_non_text = True
-
-        logger.debug("[传话筒] 消息链分析完成，包含非文本组件: %s", has_non_text)
+        self._debug_log("[传话筒][DIAG] 步骤4: 消息链分析 → has_non_text=%s, raw_text_parts=%s", has_non_text, len(raw_text_parts))
+        if plain_text:
+            self._debug_log("[传话筒][DIAG] 步骤4详情: 提取的纯文本长度=%s, 内容预览='%s'", len(plain_text), plain_text[:100])
 
         resp = event.get_extra("llm_resp")
         resp_obj = resp if isinstance(resp, LLMResponse) else None
 
         if not self._cfg_bool("enable_render", True):
-            logger.debug("[传话筒] 渲染功能已禁用，返回清洗后的文本")
+            self._debug_log("[传话筒][DIAG] 步骤5: enable_render=false → 直接返回")
             return
+        self._debug_log("[传话筒][DIAG] 步骤5: enable_render=true → 通过")
 
         if not self._is_session_enabled(event):
-            logger.debug("[传话筒] 当前会话未启用传话筒（黑白名单检查），返回清洗后的文本，会话: %s", session_id)
+            self._debug_log("[传话筒][DIAG] 步骤6: 会话未启用（黑白名单）→ 直接返回")
             return
+        self._debug_log("[传话筒][DIAG] 步骤6: 会话已启用 → 通过")
 
         render_scope = str(self.cfg().get("render_scope", "llm_only")).lower()
         allow_non_llm = render_scope == "all_text"
-        logger.debug("[传话筒] 渲染范围: %s, 允许非LLM: %s", render_scope, allow_non_llm)
+        self._debug_log("[传话筒][DIAG] 步骤7: render_scope=%s, allow_non_llm=%s", render_scope, allow_non_llm)
 
         if resp_obj is None and not allow_non_llm:
-            logger.debug("[传话筒] 无LLM响应且不允许非LLM文本，返回清洗后的文本")
+            self._debug_log("[传话筒][DIAG] 步骤8: 无LLM响应且不允许非LLM → 直接返回")
             return
+        self._debug_log("[传话筒][DIAG] 步骤8: LLM响应检查通过 (resp_obj=%s)", resp_obj is not None)
 
         if not has_non_text and raw_text_parts:
+            self._debug_log("[传话筒][DIAG] 步骤9: 进入纯文本渲染分支")
             raw_full_text = "".join(raw_text_parts)
             emotion = event.get_extra("extracted_emotion_tag")
             full_text = raw_full_text.strip()
+            self._debug_log("[传话筒][DIAG] 步骤9详情: 原始长度=%s, 清洗后长度=%s, 情绪=%s", len(raw_full_text), len(full_text), emotion)
             if full_text:
-                logger.info("[传话筒] 触发渲染判断，情绪=%s，原始文本长度=%s，清洗后长度=%s，清洗后文本='%s'",
-                          emotion, len(raw_full_text), len(full_text), full_text[:100])
                 if resp_obj is not None:
                     await self._update_conversation_history(event, full_text)
 
                 char_limit = int(self.cfg().get("render_char_threshold", 60) or 0)
                 enable_split = self._cfg_bool("split_long_text", False)
+                split_page_limit = int(self.cfg().get("split_page_char_limit", 200) or 0)
+                if split_page_limit <= 0:
+                    split_page_limit = 200
+                self._debug_log("[传话筒][DIAG] 步骤10: render_char_threshold=%s, split_long_text=%s, split_page_char_limit=%s", char_limit, enable_split, split_page_limit)
 
-                if char_limit > 0:
+                if enable_split:
                     text_len = self._count_visible_chars(full_text)
+                    self._debug_log("[传话筒][DIAG] 步骤11: 可见字符数=%s, split_page_char_limit=%s, 是否超限=%s", text_len, split_page_limit, text_len > split_page_limit)
+                    if text_len > split_page_limit:
+                        self._debug_log("[传话筒][DIAG] 步骤12: 触发分割渲染 → 调用 _render_split_text")
+                        success = await self._render_split_text(full_text, emotion, event, session_id, persona_id)
+                        if success:
+                            result.chain = []
+                            self._debug_log("[传话筒][DIAG] 步骤13: 分割渲染成功 → 返回")
+                            return
+                        self._debug_log("[传话筒][DIAG] 步骤13: 分割渲染失败 → 返回")
+                        return
+                    else:
+                        self._debug_log("[传话筒][DIAG] 步骤12: 文本未超 split_page_char_limit → 进入单图渲染")
+                elif char_limit > 0:
+                    text_len = self._count_visible_chars(full_text)
+                    self._debug_log("[传话筒][DIAG] 步骤11: 可见字符数=%s, 阈值=%s, 是否超限=%s", text_len, char_limit, text_len > char_limit)
                     if text_len > char_limit:
-                        if enable_split:
-                            logger.info("[传话筒] 文本长度 %s 超过阈值 %s，启用分割渲染", text_len, char_limit)
-                            success = await self._render_split_text(full_text, emotion, event, session_id, persona_id)
-                            if success:
-                                result.chain = []
-                                logger.info("[传话筒] 分割渲染完成，会话: %s", session_id)
-                                return
-                            logger.warning("[传话筒] 分割渲染失败，返回清洗后的文本，会话: %s", session_id)
-                            return
-                        else:
-                            logger.info("[传话筒] 文本长度 %s 超过阈值 %s，跳过渲染，返回清洗后的文本", text_len, char_limit)
-                            return
+                        self._debug_log("[传话筒][DIAG] 步骤12: split_long_text=false → 跳过渲染，直接返回")
+                        return
 
-                logger.debug("[传话筒] 开始渲染图片，会话: %s", session_id)
+                self._debug_log("[传话筒][DIAG] 步骤12: 未触发分割 → 进入单图渲染")
                 image_path = await self._render_with_fallback(full_text, emotion, session_id, persona_id)
                 if image_path:
                     try:
                         result.chain = [Comp.Image.fromFileSystem(image_path)]
                         self._schedule_cleanup(image_path, delay=90.0)
-                        logger.info("[传话筒] 渲染成功，已替换为图片，会话: %s", session_id)
+                        self._debug_log("[传话筒][DIAG] 步骤13: 单图渲染成功")
                     except Exception as exc:
-                        logger.error("[传话筒] 设置图片结果失败: %s，会话: %s，保持清洗后的文本", exc, session_id)
+                        logger.error("[传话筒][DIAG] 步骤13: 单图渲染异常: %s", exc, exc_info=True)
                 else:
-                    logger.warning("[传话筒] 渲染失败，退回纯文本，会话: %s", session_id)
+                    self._debug_log("[传话筒][DIAG] 步骤13: 单图渲染失败（无image_path）")
+            else:
+                self._debug_log("[传话筒][DIAG] 步骤9: full_text 为空 → 跳过渲染")
         else:
-            logger.debug("[传话筒] 消息链包含非文本组件或为空，跳过渲染，会话: %s", session_id)
+            self._debug_log("[传话筒][DIAG] 步骤9: has_non_text=%s 或 raw_text_parts为空 → 跳过渲染分支", has_non_text)
+
+        self._debug_log("[传话筒][DIAG] ========== on_decorating_result 结束 ==========")
 
     # ========================================================================
     # Control commands

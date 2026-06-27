@@ -41,30 +41,6 @@ class ConfigMixin:
         fallback_dir.mkdir(parents=True, exist_ok=True)
         return fallback_dir
 
-    def _sync_whitelist_from_config(self):
-        """同步配置中内置的用户ID到 whitelist.json。
-        读取 cfg 中的 whitelist_users 和 blacklist_users，写入 whitelist.json。
-        """
-        whitelist = self._load_whitelist()
-        changed = False
-
-        whitelist_users = str(self.cfg().get("whitelist_users", "") or "").strip()
-        if whitelist_users:
-            for uid in [u.strip() for u in whitelist_users.split(",") if u.strip()]:
-                if uid not in whitelist:
-                    whitelist.add(uid)
-                    changed = True
-
-        blacklist_users = str(self.cfg().get("blacklist_users", "") or "").strip()
-        if blacklist_users:
-            for uid in [u.strip() for u in blacklist_users.split(",") if u.strip()]:
-                if uid not in whitelist:
-                    whitelist.add(uid)
-                    changed = True
-
-        if changed:
-            self._save_whitelist(whitelist)
-
     # ------------------------------------------------------------------
     # Config helpers
     # ------------------------------------------------------------------
@@ -79,28 +55,6 @@ class ConfigMixin:
     def _cfg_bool(self, key: str, default: bool = True) -> bool:
         val = self.cfg().get(key, default)
         return bool(val) if not isinstance(val, str) else val.lower() in {"1", "true", "yes", "on"}
-
-    # ------------------------------------------------------------------
-    # Whitelist persistence
-    # ------------------------------------------------------------------
-
-    def _load_whitelist(self) -> set[str]:
-        if not self._whitelist_file.exists():
-            return set()
-        try:
-            raw = json.loads(self._whitelist_file.read_text(encoding="utf-8"))
-            return set(raw) if isinstance(raw, list) else set()
-        except Exception:
-            return set()
-
-    def _save_whitelist(self, data: set[str]) -> None:
-        try:
-            self._whitelist_file.write_text(
-                json.dumps(sorted(data), ensure_ascii=False, indent=2),
-                encoding="utf-8",
-            )
-        except Exception as exc:
-            logger.error("[传话筒] 保存黑白名单失败: %s", exc)
 
     # ------------------------------------------------------------------
     # Permission helpers
@@ -156,56 +110,58 @@ class ConfigMixin:
         return True
 
     def _is_session_enabled(self, event) -> bool:
-        """Return True if the session should render output."""
+        """Return True if the session should render output.
+
+        Priority (highest first):
+        1. Force-enabled / force-disabled (memory only, set by commands)
+        2. Config whitelist/blacklist (persistent)
+        """
         session_id = str(getattr(event, "unified_msg_origin", "") or "")
         if not session_id:
             return True
-        whitelist = self._load_whitelist()
+
+        # Layer 1: command override (memory only)
+        if session_id in self._force_enabled_sessions:
+            return True
+        if session_id in self._force_disabled_sessions:
+            return False
+
+        # Layer 2: persistent config whitelist/blacklist
+        whitelist = self.cfg().get("whitelist", []) or []
+        whitelist_set = set(whitelist) if isinstance(whitelist, list) else set()
         whitelist_mode = self._cfg_bool("whitelist_mode", False)
         if whitelist_mode:
-            return session_id in whitelist
+            return session_id in whitelist_set
         else:
-            return session_id not in whitelist
+            return session_id not in whitelist_set
 
     def _enable_session(self, event) -> tuple[bool, str]:
-        whitelist_mode = self._cfg_bool("whitelist_mode", False)
-        whitelist = self._load_whitelist()
+        """Force-enable rendering for this session (memory only, highest priority)."""
         session_id = str(getattr(event, "unified_msg_origin", "") or "")
+        if not session_id:
+            return False, "无法识别会话"
 
-        if whitelist_mode:
-            if session_id not in whitelist:
-                whitelist.add(session_id)
-                self._save_whitelist(whitelist)
-                return True, "已添加到白名单，传话筒已启用"
-            else:
-                return False, "已在白名单中，传话筒已启用"
-        else:
-            if session_id in whitelist:
-                whitelist.discard(session_id)
-                self._save_whitelist(whitelist)
-                return True, "已从黑名单移除，传话筒已启用"
-            else:
-                return False, "不在黑名单中，传话筒已启用"
+        # Remove from disabled set if present
+        self._force_disabled_sessions.discard(session_id)
+        # Add to enabled set
+        if session_id in self._force_enabled_sessions:
+            return False, "已在当前会话强制开启状态"
+        self._force_enabled_sessions.add(session_id)
+        return True, "已在此会话强制开启传话筒（临时，优先级最高）"
 
     def _disable_session(self, event) -> tuple[bool, str]:
-        whitelist_mode = self._cfg_bool("whitelist_mode", False)
-        whitelist = self._load_whitelist()
+        """Force-disable rendering for this session (memory only, highest priority)."""
         session_id = str(getattr(event, "unified_msg_origin", "") or "")
+        if not session_id:
+            return False, "无法识别会话"
 
-        if whitelist_mode:
-            if session_id in whitelist:
-                whitelist.discard(session_id)
-                self._save_whitelist(whitelist)
-                return True, "已从白名单移除，传话筒已禁用"
-            else:
-                return False, "不在白名单中，传话筒已禁用"
-        else:
-            if session_id not in whitelist:
-                whitelist.add(session_id)
-                self._save_whitelist(whitelist)
-                return True, "已添加到黑名单，传话筒已禁用"
-            else:
-                return False, "已在黑名单中，传话筒已禁用"
+        # Remove from enabled set if present
+        self._force_enabled_sessions.discard(session_id)
+        # Add to disabled set
+        if session_id in self._force_disabled_sessions:
+            return False, "已在当前会话强制关闭状态"
+        self._force_disabled_sessions.add(session_id)
+        return True, "已在此会话强制关闭传话筒（临时，优先级最高）"
 
     # ------------------------------------------------------------------
     # Reusable static utility methods

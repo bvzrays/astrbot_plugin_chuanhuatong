@@ -4,6 +4,13 @@
     "description": "拦截纯文本回复并渲染为图片",
     "default": true
   },
+
+  "debug": {
+    "type": "bool",
+    "description": "启用调试日志（输出详细的 [DIAG] 诊断信息）",
+    "default": false
+  },
+
   "render_scope": {
     "type": "string",
     "description": "渲染范围：llm_only=仅渲染 LLM 回复；all_text=渲染所有纯文本回复",
@@ -21,6 +28,12 @@
     "type": "bool",
     "description": "启用超长文本智能分割渲染（超过阈值时自动分割为多张图片）",
     "default": false
+  },
+
+  "split_page_char_limit": {
+    "type": "int",
+    "description": "分割渲染时每页文本长度上限（默认200字符）",
+    "default": 200
   },
 
   "merge_split_images": {
